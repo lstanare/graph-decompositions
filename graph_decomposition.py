@@ -88,7 +88,7 @@ def edges_of_cycle(cyc: tuple) -> tuple[tuple]:
     return tuple(tuple(sorted((cyc[i], cyc[(i+1) % len(cyc)]))) for i in range(len(cyc)))
 
 def format_cycle(cyc) -> str:
-    return "(" + " – ".join(str(v) for v in cyc) + ")"
+    return "(" + " - ".join(str(v) for v in cyc) + ")"
 
 # =========================================================
 # Exact cover for equal m-cycles (returns catalogs for UI)
@@ -236,8 +236,8 @@ def draw_cycles_colored(G, cycles, pos, title=None, idx_map=None):
 # Streamlit UI
 # =========================================================
 
-st.set_page_config(page_title="Dekompozicija potpunog grafa na m-cikluse", layout="wide")
-st.title("Dekompozicija potpunog grafa na cikluse jednake duljine (Alspach – slučaj m)")
+st.set_page_config(page_title="Dekompozicija grafa", layout="wide")
+st.title("Dekompozicija potpunog grafa na cikluse jednake duljine")
 
 with st.sidebar:
     st.header("Ulazni parametri")
@@ -259,7 +259,6 @@ st.markdown(
 **Napomena:**  
 - Ako je *n* **neparan**, radi se s **Kₙ**; ako je **paran**, radi se s **Kₙ − I**.  
 - Ovdje se traži **isključivo dekompozicija na m-cikluse**.  
-- Različiti **ciklusi** u dekompoziciji crtaju se **različitim bojama** radi jasne distinkcije.  
 """
 )
 
@@ -280,7 +279,7 @@ if run:
 
         with st.status("Tražim m-ciklusnu dekompoziciju…", expanded=True) as status:
             st.write("• Generiram sve kandidate za m-cikluse…")
-            st.write("• Pokrećem exact-cover pretraživanje s heuristikom najviše ograničenog brida…")
+            st.write("• Pokrećem pretraživanje egzaktnog pokrivanja s heuristikom najviše ograničenog brida…")
             ok, cycles, all_cycles, cyc_edges, edge2cycles = exact_cover_equal_m(
                 G, int(m), max_nodes=int(max_nodes)
             )
@@ -297,7 +296,7 @@ if run:
             for e in edge_list:
                 cand = edge2cycles.get(tuple(sorted(e)), [])
                 if not cand:
-                    st.markdown(f"- **Brid {e}**: _nema kandidata_")
+                    st.markdown(f"- **Brid {e}**: (nema kandidata)")
                     continue
                 lines = [f"**C{idx_map_all[cyc]}** {format_cycle(cyc)}" for cyc in cand]
                 st.markdown(f"- **Brid {e}** pokrivaju: " + "; ".join(lines))
@@ -314,7 +313,7 @@ if run:
             if rows:
                 df = pd.DataFrame(rows).sort_values(["Brid", "CiklusID"])
                 st.dataframe(df, use_container_width=True)
-                csv = df.to_csv(index=False).encode("utf-8")
+                csv = df.to_csv(index=False) #.encode("utf-8")
                 st.download_button(
                     "Preuzmi popis kandidata (CSV)",
                     data=csv,
@@ -344,8 +343,16 @@ if run:
             extra = used_edges - all_edges
 
             st.subheader("Sažetak dekompozicije")
-            st.write(f"Broj ciklusa: {len(cycles)}")
-            st.write(f"Raspodjela duljina: {dict(Counter(len(c) for c in cycles))}")
+            length_counts = Counter(len(c) for c in cycles)
+            df = pd.DataFrame({
+                "Duljina ciklusa": list(length_counts.keys()),
+                "Broj ciklusa": list(length_counts.values())
+            })
+
+            col1, col2, col3 = st.columns([1, 1, 1])
+
+            with col1:
+                st.table(df)
 
             # Legenda ciklusa (ID -> čvorovi)
             with st.expander("Legenda ciklusa (odabrani u dekompoziciji)", expanded=False):
