@@ -375,7 +375,10 @@ if run:
                     "Duljina": len(cyc)
                 })
             df_sel = pd.DataFrame(rows_sel).sort_values("CiklusID")
-            st.dataframe(df_sel, use_container_width=True)
+            col1, col2, col3 = st.columns([1, 1, 1])
+
+            with col1:
+                st.dataframe(df_sel)
             csv_sel = df_sel.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "Preuzmi odabranu dekompoziciju (CSV)",
