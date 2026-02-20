@@ -115,11 +115,66 @@ def edges_of_cycle(cycle) -> set[tuple]:
 
 
 def format_cycle(cycle) -> str:
-    """Format a cycle tuple as (v0 – v1 – ... – v_{k-1} – v0)."""
+    """Format a cycle tuple as (v0 - v1 - ... - v_{k-1} - v0)."""
     c = list(cycle)
     if len(c) > 1 and c[0] == c[-1]:
         c = c[:-1]
     return "(" + " - ".join(map(str, c)) + f" - {c[0]})"
+
+# =========================================================
+# Cyclic / 1-rotational constructions (fast paths)
+# =========================================================
+
+def develop_cycle_Zn(base_cycle: tuple[int, ...], n: int, orbit_size: int | None = None) -> list[tuple[int, ...]]:
+    """Develop (translate) a base cycle over Z_n.
+
+    Returns [(v1+i, v2+i, ..., vk+i) mod n] for i=0..orbit_size-1.
+    If orbit_size is None, uses the full orbit of size n.
+    """
+    if orbit_size is None:
+        orbit_size = n
+    k = len(base_cycle)
+    out: list[tuple[int, ...]] = []
+    for i in range(orbit_size):
+        out.append(tuple(((base_cycle[j] + i) % n) for j in range(k)))
+    return out
+
+
+def cyclic_triangle_system_7() -> list[tuple[int, int, int]]:
+    """
+    One possible base block is (1,2,4); its Z_7-develop gives 7 triples.
+    """
+    return develop_cycle_Zn((1, 2, 4), 7)
+
+
+def cyclic_sts_13() -> list[tuple[int, int, int]]:
+    """
+    Uses two base blocks {0,1,4} and {0,2,7} (full Z_13 orbits).
+    """
+    cycles: list[tuple[int, int, int]] = []
+    cycles += develop_cycle_Zn((0, 1, 4), 13)
+    cycles += develop_cycle_Zn((0, 2, 7), 13)
+    return cycles
+
+
+def cyclic_sts_15() -> list[tuple[int, int, int]]:
+    """
+    Uses base blocks {0,1,4} and {0,2,8} (full Z_15 orbits),
+    plus the short-orbit block {0,5,10} developed for i=0..4.
+    """
+    cycles: list[tuple[int, int, int]] = []
+    cycles += develop_cycle_Zn((0, 1, 4), 15)
+    cycles += develop_cycle_Zn((0, 2, 8), 15)
+    cycles += develop_cycle_Zn((0, 5, 10), 15, orbit_size=5)
+    return cycles
+
+
+def cyclic_5cycle_system_11() -> list[tuple[int, int, int, int, int]]:
+    """
+    5-cycle system of order 11.
+    Base cycle (1,2,5,3,8) developed over Z_11.
+    """
+    return develop_cycle_Zn((1, 2, 5, 3, 8), 11)
 
 # =========================================================
 # Exact cover for equal-m-cycles
@@ -208,14 +263,10 @@ def exact_cover_equal_m(G: nx.Graph, m: int, max_nodes: int = 200_000):
 # Crtanje grafova (UX-friendly)
 # =========================================================
 
-FIG_W, FIG_H = 4.0, 3.0  # veličina figura u inčima (širina, visina)
+FIG_W, FIG_H = 4.0, 3.0
 
 
 def draw_graph(G, pos=None, title=None):
-    """
-    Crta inicijalni graf s nešto manjim čvorovima / fontom kako bi dvije slike stale
-    u ekran bez prevelikog scrolla.
-    """
     if pos is None:
         pos = nx.spring_layout(G, seed=42)  # fiksni layout radi konzistentnosti
     fig, ax = plt.subplots()
@@ -229,15 +280,10 @@ def draw_graph(G, pos=None, title=None):
 
 
 def draw_cycles_colored(G, cycles, pos, title=None, idx_map=None):
-    """
-    Crta graf s obojanim m-ciklusima. Svaki ciklus dobije svoju boju.
-    Ako je zadan idx_map, indeks boje slijedi ID ciklusa (C1, C2, ...).
-    """
     fig, ax = plt.subplots()
     nx.draw_networkx_nodes(G, pos, node_size=450, ax=ax)
     nx.draw_networkx_labels(G, pos, font_size=8, ax=ax)
 
-    # dovoljno različitih boja
     cmap = plt.cm.get_cmap("tab20", max(20, len(cycles)))
     for cyc in cycles:
         idx = (idx_map[cyc] - 1) if idx_map else list(cycles).index(cyc)
@@ -263,7 +309,7 @@ with st.sidebar:
     m = st.number_input(
         "Duljina ciklusa m",
         min_value=3, max_value=24, value=3, step=1,
-        help="Ako je n neparan, dekomponira se Kₙ; ako je n paran, radi se s Kₙ − I."
+        help="Ako je n neparan, dekomponira se Kₙ; ako je n paran, radi se s Kₙ - I."
     )
     max_nodes = st.number_input(
         "Limit koraka pretraživanja",
@@ -276,22 +322,19 @@ with st.sidebar:
 st.markdown(
     """
 **Napomena:**  
-- Ako je *n* **neparan**, radi se s **Kₙ**; ako je **paran**, radi se s **Kₙ − I**.  
+- Ako je *n* **neparan**, radi se s **Kₙ**; ako je **paran**, radi se s **Kₙ - I**.  
 - Traži se **isključivo dekompozicija na m-cikluse**.  
 """
 )
 
-# Kontejner za poruke / status – IZNAD tabova
 status_container = st.container()
 
-# Inicijalni graf (računa se odmah)
 G = complete_graph_minus_perfect_matching(int(n))
 fig0, pos = draw_graph(
     G,
-    title=f"Inicijalni graf ({'Kₙ' if n % 2 else 'Kₙ − I'}) za n={int(n)}"
+    title=f"Inicijalni graf ({'Kₙ' if n % 2 else 'Kₙ - I'}) za n={int(n)}"
 )
 
-# Varijable za rezultat
 ok = False
 ok_cond = None
 cycles = []
@@ -310,55 +353,129 @@ if run:
             st.success(f"Alspach uvjet (slučaj m-ciklusa): {msg}")
 
             with st.status("Tražim m-ciklusnu dekompoziciju…", expanded=True) as status:
-                st.write("• Generiram kandidate za m-cikluse…")
-                st.write("• Pokrećem pretraživanje egzaktnog pokrivanja...")
+                n_int = int(n)
+                m_int = int(m)
 
-                ok, cycles, all_cycles, cyc_edges, edge2cycles = exact_cover_equal_m(
-                    G, int(m), max_nodes=int(max_nodes)
-                )
+                # ---------- FAST PATH: cikličke konstrukcije ----------
 
-                if ok:
-                    status.update(
-                        label="Dekompozicija pronađena ✔️ – vidi tab **Dekompozicija**.",
-                        state="complete",
-                    )
+                if (n_int, m_int) == (7, 3):
+                    st.write("• Tip konstrukcije: ciklička konstrukcija (razvoj početnog ciklusa po Z₇)")
+                    cycles = cyclic_triangle_system_7()
+                    ok = True
+
+                    all_cycles = cycles[:]
+                    cyc_edges = {cyc: edges_of_cycle(cyc) for cyc in cycles}
+
+                    from collections import defaultdict
+                    edge2cycles = defaultdict(list)
+                    for cyc in cycles:
+                        for e in cyc_edges[cyc]:
+                            edge2cycles[e].append(cyc)
+
                     idx_map_selected = {cyc: i for i, cyc in enumerate(cycles, start=1)}
+
+                elif (n_int, m_int) == (13, 3):
+                    st.write("• Tip konstrukcije: ciklička konstrukcija (razvoj početnih blokova po Z₁₃)")
+                    cycles = cyclic_sts_13()
+                    ok = True
+
+                    all_cycles = cycles[:]
+                    cyc_edges = {cyc: edges_of_cycle(cyc) for cyc in cycles}
+
+                    from collections import defaultdict
+                    edge2cycles = defaultdict(list)
+                    for cyc in cycles:
+                        for e in cyc_edges[cyc]:
+                            edge2cycles[e].append(cyc)
+
+                    idx_map_selected = {cyc: i for i, cyc in enumerate(cycles, start=1)}
+
+                elif (n_int, m_int) == (15, 3):
+                    st.write("• Tip konstrukcije: ciklička konstrukcija (razvoj početnih blokova po Z₁₅)")
+                    cycles = cyclic_sts_15()
+                    ok = True
+
+                    all_cycles = cycles[:]
+                    cyc_edges = {cyc: edges_of_cycle(cyc) for cyc in cycles}
+
+                    from collections import defaultdict
+                    edge2cycles = defaultdict(list)
+                    for cyc in cycles:
+                        for e in cyc_edges[cyc]:
+                            edge2cycles[e].append(cyc)
+
+                    idx_map_selected = {cyc: i for i, cyc in enumerate(cycles, start=1)}
+
+                elif (n_int, m_int) == (11, 5):
+                    st.write("• Tip konstrukcije: ciklička konstrukcija (razvoj početnog 5-ciklusa po Z₁₁)")
+                    cycles = cyclic_5cycle_system_11()
+                    ok = True
+
+                    all_cycles = cycles[:]
+                    cyc_edges = {cyc: edges_of_cycle(cyc) for cyc in cycles}
+
+                    from collections import defaultdict
+                    edge2cycles = defaultdict(list)
+                    for cyc in cycles:
+                        for e in cyc_edges[cyc]:
+                            edge2cycles[e].append(cyc)
+
+                    idx_map_selected = {cyc: i for i, cyc in enumerate(cycles, start=1)}
+
                 else:
-                    status.update(
-                        label="U zadanom limitu nije pronađena m-ciklusna dekompozicija ❌",
-                        state="error",
+                    st.write("• Tip postupka: egzaktno pretraživanje (problem egzaktnog pokrivanja)")
+                    st.write("• Generiram kandidate za m-cikluse…")
+                    st.write("• Pokrećem algoritam pretraživanja…")
+
+                    ok, cycles, all_cycles, cyc_edges, edge2cycles = exact_cover_equal_m(
+                        G, m_int, max_nodes=int(max_nodes)
                     )
 
-# mali hint u sidebaru kad je rješenje pronađeno
+                    if ok and not all_cycles:
+                        all_cycles = list(cycles)
+                        cyc_edges = {cyc: edges_of_cycle(cyc) for cyc in all_cycles}
+                        edge2cycles = defaultdict(list)
+                        for cyc in all_cycles:
+                            for e in cyc_edges[cyc]:
+                                edge2cycles[e].append(cyc)
+
+                    if ok:
+                        status.update(
+                            label="Dekompozicija pronađena ✔️ - vidi tab **Dekompozicija**.",
+                            state="complete",
+                        )
+                        idx_map_selected = {cyc: i for i, cyc in enumerate(cycles, start=1)}
+                    else:
+                        status.update(
+                            label="U zadanom limitu nije pronađena m-ciklusna dekompozicija ❌",
+                            state="error",
+                        )
+
 with st.sidebar:
     if ok:
         st.success("Dekompozicija pronađena.\nOtvori tab **Dekompozicija** za prikaz.")
     elif ok_cond and not ok and run:
         st.info("❌ Nije nađena dekompozicija za zadane parametre.")
 
-# -------------------------- GLAVNI TABOVI --------------------------
 tab_init, tab_dec = st.tabs(["Inicijalni graf", "Dekompozicija"])
 
-# --- TAB 1: inicijalni graf ---
 with tab_init:
     st.subheader("Inicijalni graf")
     st.pyplot(fig0, width=700, clear_figure=True)
 
-# --- TAB 2: dekompozicija + detalji ---
 with tab_dec:
     st.subheader("Dekompozicija grafa")
 
     if not run:
         st.info("Pokreni algoritam kako bi se prikazala dekompozicija.")
     elif ok_cond is False:
-        st.info("Uvjet dekompozicije nije zadovoljen – nema dekompozicije za zadane parametre.")
+        st.info("Uvjet dekompozicije nije zadovoljen - nema dekompozicije za zadane parametre.")
     elif ok_cond and not ok:
         st.info(
             "U zadanom limitu pretraživanja nije pronađena m-ciklusna dekompozicija. "
             "Pokušaj s drugim parametrima ili većim limitom."
         )
     else:
-        # imamo rješenje → lijevo graf, desno sažetak
         col_graf, col_det = st.columns([2, 1])
 
         with col_graf:
@@ -374,7 +491,6 @@ with tab_dec:
         with col_det:
             st.markdown("### Sažetak dekompozicije")
 
-            # osnovna provjera bridova
             used_edges = set()
             for cyc in cycles:
                 used_edges.update(edges_of_cycle(cyc))
@@ -391,14 +507,12 @@ with tab_dec:
                 if extra:
                     st.error(f"Viškovi (bridovi koji nisu u grafu): {sorted(extra)}")
 
-            # KRATKI SAŽETAK CIKLUSA (mala tablica, ne širi puno UI)
             length_counts = Counter(len(c) for c in cycles)
 
             st.markdown("**Kratki pregled ciklusa:**")
             for duljina, broj in sorted(length_counts.items()):
                 st.markdown(f"- broj ciklusa duljine **{duljina}**: {broj}")
 
-            # DETALJNA TABLICA – u expanderu s fiksnom visinom (scroll unutar tablice)
             rows_sel = []
             for cyc in cycles:
                 cid = idx_map_selected[cyc]
