@@ -9,4 +9,5 @@ streamlit run graph_decomposition.py
 ```
 
 ## Stranica
-U slučaju greške, aplikacija je dostupna i na sljedećem [linku](https://graph-decompositions.streamlit.app/).
+
+U slučaju greške, aplikacija je dostupna i na sljedećem [linku](https://graph-decompositions-z3rjm695byt9qy3yhsmtpi.streamlit.app/).
